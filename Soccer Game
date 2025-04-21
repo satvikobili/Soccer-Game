@@ -1,1 +1,394 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
 
+public class BallKickGame extends JFrame {
+   
+    private static final int GAME_WIDTH = 800;
+    private static final int GAME_HEIGHT = 600;
+    private static final int GROUND_Y = 500;
+    
+    private int figureX = 400;  
+    private int figureY = GROUND_Y - 100;
+    private int ballX = 50;     
+    private int ballY = GROUND_Y - 30;
+    private boolean ballMovingRight = true;
+    private int ballSpeedX = 5;
+    
+    private int figureWidth = 50;
+    private int figureHeight = 100;
+    private int leftLegAngle = 0;   
+    private int rightLegAngle = 0;  
+    private boolean leftLegKicking = false;
+    private boolean rightLegKicking = false;
+    
+    private int score = 0;
+    private boolean gameRunning = false;
+    private boolean gameStarted = false;
+    private boolean leftLegHitAttempted = false;
+    private boolean rightLegHitAttempted = false;
+    private int consecutiveMisses = 0;
+    
+    private Image dbImage;
+    private Graphics dbg;
+    
+    public BallKickGame() {
+        setTitle("Ball Kick Game");
+        setSize(GAME_WIDTH, GAME_HEIGHT);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setResizable(false);
+        setLocationRelativeTo(null);
+        
+        addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                int key = e.getKeyCode();
+                
+                if (!gameStarted) {
+                    return;
+                }
+                
+                switch (key) {
+                    case KeyEvent.VK_LEFT:
+                        figureX -= 10;
+                        break;
+                    case KeyEvent.VK_RIGHT:
+                        figureX += 10;
+                        break;
+                    case KeyEvent.VK_UP:
+                        leftLegKicking = true;
+                        leftLegAngle = -45;
+                        break;
+                    case KeyEvent.VK_DOWN:
+                        rightLegKicking = true;
+                        rightLegAngle = 45;
+                        break;
+                    case KeyEvent.VK_SPACE:
+                        if (gameRunning) {
+                            gameRunning = false;
+                        } else if (!gameRunning && gameStarted) {
+                            resetGame();
+                        }
+                        break;
+                }
+                
+                if (figureX < 0) figureX = 0;
+                if (figureX > GAME_WIDTH - figureWidth) figureX = GAME_WIDTH - figureWidth;
+            }
+            
+            @Override
+            public void keyReleased(KeyEvent e) {
+                int key = e.getKeyCode();
+                
+                if (key == KeyEvent.VK_UP) {
+                    leftLegKicking = false;
+                    leftLegAngle = 0;
+                } else if (key == KeyEvent.VK_DOWN) {
+                    rightLegKicking = false;
+                    rightLegAngle = 0;
+                }
+            }
+        });
+        
+        setFocusable(true);
+        
+        Timer timer = new Timer(16, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (gameRunning) {
+                    updateGame();
+                }
+                repaint();
+            }
+        });
+        timer.start();
+        
+        showGamePrompt();
+    }
+    
+    private void showGamePrompt() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new FlowLayout());
+        
+        JLabel promptLabel = new JLabel("Do you want to play this game?");
+        JButton yesButton = new JButton("Yes");
+        JButton noButton = new JButton("No");
+        
+        panel.add(promptLabel);
+        panel.add(yesButton);
+        panel.add(noButton);
+        
+        yesButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                getContentPane().remove(panel);
+                resetGame();
+                gameStarted = true;
+                gameRunning = true;
+                requestFocus();
+                repaint();
+            }
+        });
+        
+        noButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                System.exit(0);
+            }
+        });
+        
+        getContentPane().setLayout(new GridBagLayout());
+        getContentPane().add(panel);
+        validate();
+    }
+    
+    private void resetGame() {
+        figureX = 400;
+        figureY = GROUND_Y - 100;
+        ballX = 50;
+        ballY = GROUND_Y - 30;
+        ballMovingRight = true;
+        ballSpeedX = 5;
+        score = 0;
+        leftLegAngle = 0;
+        rightLegAngle = 0;
+        leftLegKicking = false;
+        rightLegKicking = false;
+        leftLegHitAttempted = false;
+        rightLegHitAttempted = false;
+        consecutiveMisses = 0;
+        gameRunning = true;
+        
+        getContentPane().removeAll();
+        getContentPane().setLayout(null);
+        validate();
+    }
+    
+    private void updateGame() {
+        if (ballMovingRight) {
+            ballX += ballSpeedX;
+            
+            if (ballX > GAME_WIDTH - 30) {
+                ballMovingRight = false;
+                
+                if (rightLegHitAttempted) {
+                    consecutiveMisses++;
+                }
+                
+                leftLegHitAttempted = false;
+                rightLegHitAttempted = false;
+            }
+        } else {
+            ballX -= ballSpeedX;
+            
+            if (ballX < 0) {
+                ballMovingRight = true;
+
+                if (leftLegHitAttempted) {
+                    consecutiveMisses++;
+                }
+                
+                leftLegHitAttempted = false;
+                rightLegHitAttempted = false;
+            }
+        }
+        
+        checkCollisions();
+
+        if (consecutiveMisses >= 3) {
+            gameRunning = false;
+        }
+    }
+    
+    private void checkCollisions() {
+        int ballWidth = 30;
+        int ballHeight = 30;
+        
+        int leftFootX = figureX;
+        int leftFootY = figureY + figureHeight;
+        int rightFootX = figureX + figureWidth;
+        int rightFootY = figureY + figureHeight;
+        
+        int leftFootEndX = (int)(leftFootX + 60 * Math.sin(Math.toRadians(leftLegAngle)));
+        int leftFootEndY = (int)(leftFootY + 60 * Math.cos(Math.toRadians(leftLegAngle)));
+        
+        int rightFootEndX = (int)(rightFootX + 60 * Math.sin(Math.toRadians(rightLegAngle)));
+        int rightFootEndY = (int)(rightFootY + 60 * Math.cos(Math.toRadians(rightLegAngle)));
+        
+        Rectangle ballRect = new Rectangle(ballX, ballY, ballWidth, ballHeight);
+        
+        if (leftLegKicking && !leftLegHitAttempted) {
+            if (ballRect.intersectsLine(leftFootX, leftFootY, leftFootEndX, leftFootEndY)) {
+                if (ballMovingRight) {
+                    ballMovingRight = false;
+                    ballSpeedX += 1; 
+                    score++;
+                    consecutiveMisses = 0; 
+                }
+                leftLegHitAttempted = true;
+            }
+        }
+        
+        if (rightLegKicking && !rightLegHitAttempted) {
+            if (ballRect.intersectsLine(rightFootX, rightFootY, rightFootEndX, rightFootEndY)) {
+                if (!ballMovingRight) {
+                    ballMovingRight = true;
+                    ballSpeedX += 1; 
+                    score++;
+                    consecutiveMisses = 0; 
+                }
+                rightLegHitAttempted = true;
+            }
+        }
+        
+        if (ballMovingRight && ballX > figureX + figureWidth && !rightLegHitAttempted) {
+            rightLegHitAttempted = true;
+        }
+        
+        if (!ballMovingRight && ballX + ballWidth < figureX && !leftLegHitAttempted) {
+            leftLegHitAttempted = true;
+        }
+    }
+    
+    @Override
+    public void paint(Graphics g) {
+        if (!gameStarted) {
+            super.paint(g); 
+            return;
+        }
+        
+        if (dbImage == null) {
+            dbImage = createImage(GAME_WIDTH, GAME_HEIGHT);
+            if (dbImage == null) {
+                return;
+            }
+            dbg = dbImage.getGraphics();
+        }
+        
+        dbg.setColor(Color.WHITE);
+        dbg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+        
+        dbg.setColor(new Color(34, 139, 34)); 
+        dbg.fillRect(0, GROUND_Y, GAME_WIDTH, GAME_HEIGHT - GROUND_Y);
+        
+        drawStickFigure(dbg);
+        
+        dbg.setColor(Color.RED);
+        dbg.fillOval(ballX, ballY, 30, 30);
+        
+        dbg.setColor(Color.BLACK);
+        dbg.setFont(new Font("Arial", Font.BOLD, 20));
+        dbg.drawString("Score: " + score, 20, 30);
+        dbg.drawString("Speed: " + ballSpeedX, 20, 60);
+        dbg.drawString("Misses: " + consecutiveMisses + "/3", 20, 90);
+        
+        dbg.setFont(new Font("Arial", Font.PLAIN, 16));
+        dbg.drawString("LEFT/RIGHT: Move", GAME_WIDTH - 200, 30);
+        dbg.drawString("UP: Kick with left leg", GAME_WIDTH - 200, 50);
+        dbg.drawString("DOWN: Kick with right leg", GAME_WIDTH - 200, 70);
+        dbg.drawString("SPACE: Stop game", GAME_WIDTH - 200, 90);
+        
+        if (!gameRunning && gameStarted) {
+            dbg.setColor(new Color(0, 0, 0, 180));
+            dbg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            
+            dbg.setColor(Color.WHITE);
+            dbg.setFont(new Font("Arial", Font.BOLD, 48));
+            String gameOverText = "Game Over!";
+            FontMetrics fm = dbg.getFontMetrics();
+            int textWidth = fm.stringWidth(gameOverText);
+            dbg.drawString(gameOverText, (GAME_WIDTH - textWidth) / 2, GAME_HEIGHT / 2 - 50);
+            
+            dbg.setFont(new Font("Arial", Font.BOLD, 32));
+            String scoreText = "Final Score: " + score;
+            fm = dbg.getFontMetrics();
+            textWidth = fm.stringWidth(scoreText);
+            dbg.drawString(scoreText, (GAME_WIDTH - textWidth) / 2, GAME_HEIGHT / 2);
+            
+            dbg.setFont(new Font("Arial", Font.BOLD, 24));
+            String restartText = "Press SPACE to play again";
+            fm = dbg.getFontMetrics();
+            textWidth = fm.stringWidth(restartText);
+            dbg.drawString(restartText, (GAME_WIDTH - textWidth) / 2, GAME_HEIGHT / 2 + 50);
+            
+            dbg.setFont(new Font("Arial", Font.BOLD, 20));
+            String exitText = "Close window to exit game";
+            fm = dbg.getFontMetrics();
+            textWidth = fm.stringWidth(exitText);
+            dbg.drawString(exitText, (GAME_WIDTH - textWidth) / 2, GAME_HEIGHT / 2 + 90);
+        }
+        
+        g.drawImage(dbImage, 0, 0, this);
+    }
+    
+    private void drawStickFigure(Graphics g) {
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setStroke(new BasicStroke(3));
+        g2d.setColor(Color.BLACK);
+        
+        int headSize = 30;
+        g2d.drawOval(figureX + figureWidth/2 - headSize/2, figureY - headSize, headSize, headSize);
+        
+        g2d.drawLine(figureX + figureWidth/2, figureY, figureX + figureWidth/2, figureY + figureHeight - 30);
+        
+        g2d.drawLine(figureX + figureWidth/2, figureY + 20, figureX, figureY + 10);
+        g2d.drawLine(figureX + figureWidth/2, figureY + 20, figureX + figureWidth, figureY + 10);
+        
+        int hipX = figureX + figureWidth/2;
+        int hipY = figureY + figureHeight - 30;
+        
+        int leftKneeX = figureX + 10;
+        int leftKneeY = figureY + figureHeight - 15;
+        int leftFootX = figureX;
+        int leftFootY = figureY + figureHeight;
+        
+        if (leftLegKicking) {
+            leftFootX = (int)(leftKneeX + 30 * Math.sin(Math.toRadians(leftLegAngle)));
+            leftFootY = (int)(leftKneeY + 30 * Math.cos(Math.toRadians(leftLegAngle)));
+            
+            g2d.setColor(new Color(255, 0, 0, 100)); 
+        }
+        
+        g2d.drawLine(hipX, hipY, leftKneeX, leftKneeY);
+        g2d.drawLine(leftKneeX, leftKneeY, leftFootX, leftFootY);
+        
+        g2d.setColor(Color.BLACK);
+        
+        int rightKneeX = figureX + figureWidth - 10;
+        int rightKneeY = figureY + figureHeight - 15;
+        int rightFootX = figureX + figureWidth;
+        int rightFootY = figureY + figureHeight;
+        
+        if (rightLegKicking) {
+            rightFootX = (int)(rightKneeX + 30 * Math.sin(Math.toRadians(rightLegAngle)));
+            rightFootY = (int)(rightKneeY + 30 * Math.cos(Math.toRadians(rightLegAngle)));
+            
+            g2d.setColor(new Color(255, 0, 0, 100)); 
+        }
+        
+        g2d.drawLine(hipX, hipY, rightKneeX, rightKneeY);
+        g2d.drawLine(rightKneeX, rightKneeY, rightFootX, rightFootY);
+        
+        g2d.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{5, 5}, 0));
+        
+        if (leftLegKicking) {
+            g2d.setColor(new Color(0, 0, 255, 100));
+            g2d.drawLine(leftFootX, leftFootY, 
+                         (int)(leftFootX + 40 * Math.sin(Math.toRadians(leftLegAngle))), 
+                         (int)(leftFootY + 40 * Math.cos(Math.toRadians(leftLegAngle))));
+        }
+        
+        if (rightLegKicking) {
+            g2d.setColor(new Color(0, 0, 255, 100));
+            g2d.drawLine(rightFootX, rightFootY, 
+                         (int)(rightFootX + 40 * Math.sin(Math.toRadians(rightLegAngle))), 
+                         (int)(rightFootY + 40 * Math.cos(Math.toRadians(rightLegAngle))));
+        }
+    }
+    
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            new BallKickGame().setVisible(true);
+        });
+    }
+}
